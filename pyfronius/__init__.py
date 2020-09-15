@@ -24,6 +24,9 @@ URL_DEVICE_INVERTER_CUMULATIVE = "GetInverterRealtimeData.cgi?Scope=Device&" \
 URL_DEVICE_INVERTER_COMMON = "GetInverterRealtimeData.cgi?" \
                              "Scope=Device&DeviceId={}&" \
                              "DataCollection=CommonInverterData"
+URL_DEVICE_INVERTER_COMMON_V0 = "GetInverterRealtimeData.cgi?" \
+                                "Scope=Device&DeviceIndex={}&" \
+                                "DataCollection=CommonInverterData"
 
 
 class Fronius:
@@ -35,15 +38,17 @@ class Fronius:
                     (i.e. http://192.168.0.10:80)
         useHTTPS    Use HTTPS instead of HTTP
         timeout     HTTP timeout in seconds
+        api_version Version of Fronius Solar API (defaults to 1)
     """
 
-    def __init__(self, session, url, timeout=10):
+    def __init__(self, session, url, timeout=10, api_version=1):
         """
         Constructor
         """
         self._aio_session = session
         self.url = url
         self.timeout = timeout
+        self.api_version = api_version
 
     async def _fetch_json(self, url):
         """
@@ -62,12 +67,14 @@ class Fronius:
                 "Host returned a non-JSON reply at {}.".format(url))
         return res
 
-    async def _fetch_solar_api_v1(self, spec):
+    async def _fetch_solar_api(self, spec):
         """
         Fetch page of solar_api
         """
-        res = await self._fetch_json("{}/solar_api/v1/{}".format(
-            self.url, spec))
+        if self.api_version == 1:
+            res = await self._fetch_json("{}/solar_api/v1/{}".format(self.url, spec))
+        else:
+            res = await self._fetch_json("{}/solar_api/{}".format(self.url, spec))
         return res
 
     @staticmethod
@@ -81,7 +88,7 @@ class Fronius:
         return sensor
 
     async def _current_data(self, spec, fun):
-        res = await self._fetch_solar_api_v1(spec)
+        res = await self._fetch_solar_api(spec)
 
         sensor = Fronius._status_data(res)
 
@@ -147,7 +154,10 @@ class Fronius:
         """
         Get the current inverter data of one device.
         """
-        url = URL_DEVICE_INVERTER_COMMON.format(device)
+        if self.api_version == 1:
+            url = URL_DEVICE_INVERTER_COMMON.format(device)
+        else:
+            url = URL_DEVICE_INVERTER_COMMON_V0.format(device)
 
         _LOGGER.debug("Get current inverter data for {}".format(url))
 
